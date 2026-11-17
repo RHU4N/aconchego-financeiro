@@ -1,0 +1,6 @@
+{
+  "name": "Aconchego Finanças",
+  "description": "Aplicativo acolhedor e simples para controle financeiro pessoal, despesas, receitas, orçamentos, cofrinhos e comprovantes.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
