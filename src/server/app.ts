@@ -3,17 +3,17 @@ import {
   AuthenticatedRequest,
   TokenVerifier,
   createAuthMiddleware,
-} from './authMiddleware';
-import { InMemoryServerFinanceStore, ServerFinanceStore, SupabaseServerFinanceStore } from './dataStore';
-import { SlidingWindowRateLimiter, createRateLimitMiddleware } from './rateLimiter';
+} from './authMiddleware.js';
+import { InMemoryServerFinanceStore, ServerFinanceStore, SupabaseServerFinanceStore } from './dataStore.js';
+import { SlidingWindowRateLimiter, createRateLimitMiddleware } from './rateLimiter.js';
 import {
   ScanReceiptDeps,
   ScannerHttpError,
   getConfiguredGeminiModel,
   scanReceiptImage,
-} from './receiptScanner';
-import { AgentChatDeps, AgentHttpError, runAgentChatTurn } from './agentService';
-import { AgentConfirmRequestSchema } from './schemas';
+} from './receiptScanner.js';
+import { AgentChatDeps, AgentHttpError, runAgentChatTurn } from './agentService.js';
+import { AgentConfirmRequestSchema } from './schemas.js';
 
 export interface CreateApiAppOptions {
   verifyToken?: TokenVerifier;
@@ -113,7 +113,10 @@ export function createApiApp(options: CreateApiAppOptions = {}): Express {
             ...(err.details || {}),
           });
         }
-        console.error('Erro inesperado no scanner:', err);
+        console.error(
+          'Erro inesperado no scanner:',
+          err instanceof Error ? err.message : 'erro desconhecido'
+        );
         return res.status(500).json({
           error: 'Erro interno ao processar comprovante.',
         });
@@ -135,7 +138,10 @@ export function createApiApp(options: CreateApiAppOptions = {}): Express {
         if (err instanceof AgentHttpError) {
           return res.status(err.statusCode).json({ error: err.message });
         }
-        console.error('Erro no Assistente Financeiro:', err);
+        console.error(
+          'Erro no Assistente Financeiro:',
+          err instanceof Error ? err.message : 'erro desconhecido'
+        );
         return res.status(500).json({
           error: 'Não foi possível processar sua pergunta no momento.',
         });

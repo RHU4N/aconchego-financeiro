@@ -76,7 +76,7 @@ Mais detalhes em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - **Backend / Serverless**: Node.js 22/24, Express 4, Zod, Vercel Functions (`api/[...route].ts`)
 - **Banco de Dados, Auth e Storage**: `@supabase/supabase-js` (PostgreSQL, Supabase Auth, Storage privado, RLS)
 - **Inteligência Artificial**: `@google/genai` (`^3.4.0`, modelo configurável via `GEMINI_MODEL`)
-- **Qualidade e Testes**: Vitest, Testing Library (`@testing-library/react`, `jsdom`), Supertest, GitHub Actions
+- **Qualidade e Testes**: Vitest, Testing Library (`@testing-library/react`, `jsdom`), Supertest, Playwright (`@playwright/test`), GitHub Actions
 
 ## 7. Interfaces do Sistema
 
@@ -104,6 +104,8 @@ aconchego-financeiro/
 │   ├── DATABASE.md
 │   ├── DEPLOYMENT.md
 │   └── TESTING.md
+├── e2e/
+│   └── aconchego.spec.ts                 # Testes E2E reais em navegador (Playwright)
 ├── src/
 │   ├── assets/images/                    # Imagens locais empacotadas pelo Vite
 │   ├── components/                       # Telas e modais React
@@ -115,10 +117,12 @@ aconchego-financeiro/
 │   ├── services/financeRepository.ts     # Persistência Supabase RLS e Demo isolada
 │   ├── tests/                            # Testes unitários, integração e UI
 │   ├── types/finance.ts                  # Contratos TypeScript
-│   └── utils/                            # Matemática financeira em centavos, datas e assets
-├── supabase/migrations/                  # Migrations SQL versionadas
+│   ├── utils/                            # Matemática financeira em centavos, datas e assets
+│   └── vite-env.d.ts                     # Tipos Vite desacoplados do tsconfig serverless
+├── supabase/migrations/                  # Migrations SQL versionadas (schema + hardening)
 ├── .env.example                          # Variáveis de ambiente necessárias
 ├── package.json
+├── playwright.config.ts                  # Configuração Playwright E2E (local e Preview URL)
 ├── server.ts                             # Servidor Express + Vite para execução local
 ├── vercel.json                           # Configuração SPA + Functions na Vercel
 └── vitest.config.ts
@@ -126,16 +130,16 @@ aconchego-financeiro/
 
 ## 9. Modelo de Dados Supabase
 
-As tabelas relacionais em `supabase/migrations/20261117000001_initial_schema.sql` incluem:
+As tabelas relacionais em `supabase/migrations/20261117000001_initial_schema.sql` (com hardening complementar em `supabase/migrations/20261118000002_security_advisors_hardening.sql`) incluem:
 - `profiles`, `categories`, `receipts`, `transactions`, `budgets`, `financial_goals`, `goal_contributions`, `agent_conversations`, `agent_messages` e `agent_operations`.
-- Valores monetários em `numeric(14,2)` com constraints `CHECK`, chaves estrangeiras com `ON DELETE CASCADE` e chaves únicas para bloqueio de duplicidade (`(user_id, file_hash)` e `(user_id, idempotency_key)`).
+- Valores monetários em `numeric(14,2)` com constraints `CHECK`, chaves estrangeiras indexadas (`idx_transactions_receipt_id`, `idx_agent_operations_conversation_id`, `idx_agent_messages_operation_id`) com `ON DELETE CASCADE` e chaves únicas para bloqueio de duplicidade (`(user_id, file_hash)` e `(user_id, idempotency_key)`).
 
 Consulte o diagrama ER e o detalhamento completo em [`docs/DATABASE.md`](docs/DATABASE.md).
 
 ## 10. Autenticação, RLS e Storage
 
-- **RLS ativo em todas as 10 tabelas** com políticas `SELECT`, `INSERT`, `UPDATE` e `DELETE` restritas a `auth.uid()`.
-- **Imutabilidade de proprietário:** triggers impedem alteração de `user_id` ou `profiles.id`.
+- **RLS ativo em todas as 10 tabelas** com políticas `SELECT`, `INSERT`, `UPDATE` e `DELETE` restritas a `(select auth.uid())`.
+- **Hardening de funções**: funções e triggers com `SET search_path = public` (incluindo imutabilidade de `user_id` e `profiles.id`).
 - **Storage privado:** buckets `receipts` e `goal-images` (`public = false`) com acesso por pasta `auth.uid()` e leitura via `createSignedUrl` com expiração de 1 hora.
 - **SMTP Auth:** para uso público, configure SMTP próprio no Supabase Auth conforme descrito em [`docs/DATABASE.md`](docs/DATABASE.md) e [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
@@ -166,6 +170,7 @@ Acesse `http://localhost:3000`. Sem variáveis do Supabase no `.env`, você aind
 Outros scripts disponíveis:
 - `npm run lint` — Verificação TypeScript (`tsc --noEmit`)
 - `npm test` — Execução da suíte Vitest
+- `npm run test:e2e` — Testes E2E em navegador Chromium com Playwright (`e2e/aconchego.spec.ts`)
 - `npm run build` — Build de produção Vite (`dist/`)
 - `npm run start` — Inicia o servidor Express (`tsx server.ts`)
 - `npm run clean` — Remove diretórios `dist`, `coverage` e `server.js`
@@ -177,23 +182,27 @@ Outros scripts disponíveis:
    npx supabase link --project-ref SEU_PROJECT_REF
    npx supabase db push
    ```
-2. Ou copie e execute [`supabase/migrations/20261117000001_initial_schema.sql`](supabase/migrations/20261117000001_initial_schema.sql) diretamente no **SQL Editor** do painel Supabase.
+2. Ou copie e execute em ordem no **SQL Editor** do painel Supabase:
+   - [`supabase/migrations/20261117000001_initial_schema.sql`](supabase/migrations/20261117000001_initial_schema.sql)
+   - [`supabase/migrations/20261118000002_security_advisors_hardening.sql`](supabase/migrations/20261118000002_security_advisors_hardening.sql)
 
 ## 14. Como Testar
 
 ```bash
 npm run lint
 npm test
+npm run test:e2e
 npm run build
 ```
 
-Mais detalhes sobre escopo de testes e mocks em [`docs/TESTING.md`](docs/TESTING.md).
+Mais detalhes sobre escopo de testes, E2E e mocks em [`docs/TESTING.md`](docs/TESTING.md).
 
 ## 15. Como Publicar na Vercel
 
-1. Conecte o repositório na Vercel com **Framework Preset: Vite**, **Build Command: `npm run build`** e **Output Directory: `dist`**.
-2. Cadastre as 5 variáveis de ambiente do `.env.example` nas configurações do projeto (Preview e Production).
+1. Conecte o repositório `RHU4N/aconchego-financeiro` (fork de `medeirosfbia/aconchego-financeiro`) na Vercel com **Framework Preset: Vite**, **Build Command: `npm run build`** e **Output Directory: `dist`**.
+2. Cadastre as 5 variáveis de ambiente do `.env.example` nas configurações do projeto (`Preview` e `Production`).
 3. Configure `Site URL` e `Redirect URLs` no Supabase Auth com o domínio gerado pela Vercel.
+4. Preview atualmente publicado (sem variáveis de produção configuradas): `https://aconchego-financeiro-9vls9qn3r-rhu4ns-projects.vercel.app`.
 
 Passo a passo detalhado em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
@@ -201,24 +210,29 @@ Passo a passo detalhado em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 Execuções verificadas neste ambiente após a última alteração de código:
 - **`npm run lint` (`tsc --noEmit`)**: aprovado com código de saída `0`.
-- **`npm test` (`vitest run`)**: **4 arquivos de teste, 27/27 testes aprovados**:
+- **`npm test` (`vitest run`)**: **4 arquivos de teste, 28/28 testes aprovados**:
   - `src/tests/financeMath.test.ts`: 9 testes aprovados (precisão em centavos, regra `paid` vs `pending`, orçamentos, cofrinhos, formatadores).
   - `src/tests/schemas.test.ts`: 5 testes aprovados (magic bytes, schemas do scanner e das ferramentas do agente, bloqueio de `userId`).
-  - `src/tests/api.integration.test.ts`: 8 testes aprovados (auth 401, scanner 415/422/409/429/200, os 5 cenários do agente, idempotência 409 e isolamento entre `user-a` e `user-b`).
+  - `src/tests/api.integration.test.ts`: 9 testes aprovados (auth 401, scanner 415/422/409/429/200, os 5 cenários do agente, idempotência 409, isolamento entre `user-a` e `user-b` e bloqueio de prompt injection tentando injetar `userId` alheio).
   - `src/tests/app.ui.test.tsx`: 5 testes aprovados (AuthView, conta nova vazia com mês dinâmico, Modo Demonstração, revisão humana obrigatória no scanner e confirmação no Assistente IA).
-- **`npm run build` (`vite build`)**: build concluído em ~992ms gerando `dist/index.html`, JS, CSS e os 4 assets em `dist/assets/`.
-- **Health check Node/Express (`api/[...route].ts`)**: `GET /api/health` respondeu HTTP `200` (`{"ok":true,"service":"aconchego-financas","model":"gemini-2.5-flash",...}`).
+- **`npm run test:e2e` (`playwright test` em `http://127.0.0.1:3100`)**: **4 testes aprovados, 1 teste ignorado (skipped)** por ausência de credenciais reais (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`).
+- **`npm run build` (`vite build`)**: build concluído gerando `dist/index.html`, bundle JS/CSS e os assets em `dist/assets/`.
+- **Preview na Vercel (`https://aconchego-financeiro-9vls9qn3r-rhu4ns-projects.vercel.app` via `vercel curl`)**:
+  - `GET /api/health` → `HTTP 200` (`{"ok":true,"service":"aconchego-financas","geminiConfigured":false,"model":"gemini-2.5-flash",...}`)
+  - `HEAD /` e `GET /extrato` → `HTTP 200`
+  - `POST /api/agent/chat` e `POST /api/receipts/scan` sem autenticação → `HTTP 401 Unauthorized`
 
-## 17. Limitações Reais
+## 17. Limitações Reais e Itens Não Validados ao Vivo
 
-- **Dependência de credenciais externas**: Este ambiente não possui `.env` preenchido com projeto Supabase ativo nem `GEMINI_API_KEY` real; portanto, testes ponta a ponta ao vivo contra Supabase Auth/PostgreSQL/Storage e chamadas reais à API Gemini devem ser validados após configurar as chaves no `.env` e na Vercel.
-- **Testes com mocks**: Os testes de integração e UI (`api.integration.test.ts` e `app.ui.test.tsx`) utilizam respostas Gemini simuladas e `InMemoryServerFinanceStore` para validar lógica, segurança e contratos sem depender de rede externa.
-- **Escopo financeiro**: Não há integração bancária real (Open Finance, Pix automático ou movimentação bancária); todos os lançamentos e cofrinhos representam controle financeiro pessoal.
+- **Pendente de credenciais e autorização (`NÃO VALIDADO` ao vivo)**: este ambiente não possui `.env` preenchido com projeto Supabase dedicado ao Aconchego nem `GEMINI_API_KEY` real; além disso, as 2 migrations SQL ainda não foram aplicadas remotamente no Supabase por dependerem de autorização explícita e definição do projeto alvo. Testes ao vivo contra Supabase Auth/PostgreSQL/RLS/Storage e contra a API Gemini real permanecem pendentes.
+- **Testes com mocks**: os testes de integração e UI (`api.integration.test.ts` e `app.ui.test.tsx`) utilizam respostas Gemini simuladas e `InMemoryServerFinanceStore` para validar lógica, segurança e contratos sem depender de rede externa.
+- **Playwright no Preview URL protegido**: o Playwright contra a URL externa de Preview sem `VERCEL_BYPASS_TOKEN` é interceptado pela proteção SSO da Vercel; as rotas do Preview foram validadas com `vercel curl`.
+- **Escopo financeiro**: não há integração bancária real (Open Finance, Pix automático ou movimentação bancária); todos os lançamentos e cofrinhos representam controle financeiro pessoal.
 - **Dependências herdadas não utilizadas diretamente**: `motion` e `autoprefixer` permanecem em `package.json` desde o protótipo inicial (para eventual remoção apenas mediante confirmação), e `esbuild` foi atualizado de `^0.25.0` para `^0.28.0` para compatibilidade de peer dependency com `vite@8` no `npm`.
 
 ## 18. Melhorias Futuras
 
-- Execução automatizada de testes End-to-End com Playwright contra instância de staging do Supabase.
+- Aplicar as migrations no projeto Supabase dedicado ao Aconchego Finanças e executar o teste E2E #5 (Supabase + Gemini ao vivo) após cadastrar credenciais reais no `.env` e na Vercel.
 - Suporte a gerenciamento customizado de categorias pela interface (`categories` já está modelada no PostgreSQL).
 - Recorrência programada de lançamentos fixos (aluguel, salário, assinaturas).
 - Relatórios comparativos multi-mês e metas de economia vinculadas a alertas de orçamento.

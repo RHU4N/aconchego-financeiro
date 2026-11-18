@@ -9,7 +9,9 @@
 ## 2. Configuração do Supabase
 
 ### 2.1 Aplicar Migrations
-Execute a migration versionada [`supabase/migrations/20261117000001_initial_schema.sql`](../supabase/migrations/20261117000001_initial_schema.sql):
+Execute as migrations versionadas em ordem cronológica:
+1. [`supabase/migrations/20261117000001_initial_schema.sql`](../supabase/migrations/20261117000001_initial_schema.sql) — schema relacional inicial, triggers, RLS e buckets privados.
+2. [`supabase/migrations/20261118000002_security_advisors_hardening.sql`](../supabase/migrations/20261118000002_security_advisors_hardening.sql) — `SET search_path = public` nas funções, índices adicionais de chaves estrangeiras e políticas RLS otimizadas com `(select auth.uid())`.
 
 - **Via Supabase CLI:**
   ```bash
@@ -17,7 +19,7 @@ Execute a migration versionada [`supabase/migrations/20261117000001_initial_sche
   npx supabase db push
   ```
 - **Via SQL Editor (Painel Supabase):**
-  Cole e execute todo o conteúdo de `supabase/migrations/20261117000001_initial_schema.sql`.
+  Cole e execute primeiro `20261117000001_initial_schema.sql` e em seguida `20261118000002_security_advisors_hardening.sql`.
 
 Verifique após executar:
 1. As 10 tabelas existem no schema `public` com RLS ativado.
@@ -49,7 +51,12 @@ O arquivo [`vercel.json`](../vercel.json) e a função serverless [`api/[...rout
 - Fallback SPA para `index.html` em todas as rotas de navegador.
 
 Passos no painel da Vercel:
-1. Importe o repositório `medeirosfbia/aconchego-financeiro`.
+1. Importe o repositório `RHU4N/aconchego-financeiro` (fork de evolução do original `medeirosfbia/aconchego-financeiro`).
 2. Mantenha **Framework Preset: Vite**, **Build Command: `npm run build`** e **Output Directory: `dist`**.
 3. Cadastre as 5 variáveis de ambiente para **Production** e **Preview**.
-4. Gere primeiro um **Preview Deployment** e valide os 10 critérios de sucesso antes de promover para produção.
+4. Gere primeiro um **Preview Deployment** e valide os critérios de segurança, banco e IA antes de promover para produção.
+
+### Estado atual do Preview na Vercel
+- **Projeto Vercel**: `rhu4ns-projects/aconchego-financeiro`
+- **URL de Preview**: `https://aconchego-financeiro-9vls9qn3r-rhu4ns-projects.vercel.app` (Deployment `dpl_Dtfg4Z79ogBiyzs2s8YuZExMutkV`)
+- **Pendências antes da promoção para Production**: configurar no projeto Vercel e no `.env` as chaves reais `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` e `APP_URL`, além de autorizar e aplicar as 2 migrations no projeto Supabase dedicado ao Aconchego Finanças.

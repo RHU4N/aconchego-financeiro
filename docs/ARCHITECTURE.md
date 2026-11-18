@@ -39,14 +39,14 @@ flowchart LR
   - `SupabaseFinanceRepository`: persistência real no PostgreSQL e upload em buckets privados (`receipts`, `goal-images`) com geração de URLs assinadas temporárias.
   - `DemoFinanceRepository`: persistência isolada em `localStorage` exclusivamente para o Modo Demonstração voluntário.
 - `src/utils/financeMath.ts`: Regras contábeis e financeiras determinísticas em centavos inteiros (`toCents`, `fromCents`, `calculatePeriodSummary`, `calculateBudgetStatuses`, `calculateGoalProgress`, `applyGoalContribution`, `calculateCategorySpending`).
-- `src/utils/assets.ts`: Importação estática de imagens locais (`src/assets/images/*`) para resolução correta após o build da Vercel/Vite.
-- `src/server/`:
-  - `app.ts`: Fábrica Express desacoplada para execução local, serverless e testes com `supertest`.
-  - `authMiddleware.ts`: Validação de token JWT via `supabase.auth.getUser(token)` e rejeição de requisições não autenticadas.
+- `src/utils/assets.ts`: Importação estática de imagens locais (`src/assets/images/*`) para resolução correta após o build da Vercel/Vite, tipada via `src/vite-env.d.ts` (evitando erro `TS2688` na compilação serverless).
+- `src/server/` (`imports ESM com extensão .js` para compatibilidade com Node 24 nas Vercel Functions):
+  - `app.ts`: Fábrica Express desacoplada para execução local, serverless e testes com `supertest`, com logs de erro sanitizados (sem exposição de stacks ou credenciais em produção).
+  - `authMiddleware.ts`: Validação de token JWT via `supabase.auth.getUser(token)` e rejeição de requisições não autenticadas (com logs sanitizados para `err.message`).
   - `rateLimiter.ts`: Limitador de taxa por usuário/IP em janela deslizante.
   - `schemas.ts`: Schemas `zod`, detecção de MIME real por magic bytes e bloqueio de parâmetros `userId` gerados por IA.
-  - `receiptScanner.ts`: Leitura estruturada de documentos fiscais e contas via `@google/genai` com timeout, hash SHA-256 anti-duplicação e marcação de `uncertainFields`.
-  - `agentService.ts`: Loop de function calling com máximo de 3 rodadas, cálculos determinísticos e propostas de gravação aguardando confirmação humana.
+  - `receiptScanner.ts`: Leitura estruturada de documentos fiscais e contas via `@google/genai` com timeout, hash SHA-256 anti-duplicação, marcação de `uncertainFields` e instruções anti-prompt-injection contra texto malicioso embutido em recibos.
+  - `agentService.ts`: Loop de function calling com máximo de 3 rodadas, cálculos determinísticos, saneamento de caracteres de controle, regras anti-prompt-injection e propostas de gravação aguardando confirmação humana.
   - `dataStore.ts`: Persistência do agente e execução idempotente de operações confirmadas.
 
 ## 4. Fluxo de Desenvolvimento e Separação de Requisitos

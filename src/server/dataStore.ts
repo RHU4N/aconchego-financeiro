@@ -9,9 +9,9 @@ import {
   PaymentMethod,
   PiggyBankGoal,
   Transaction,
-} from '../types/finance';
-import { DEFAULT_CATEGORIES } from '../data/categories';
-import { applyGoalContribution, fromCents, toCents } from '../utils/financeMath';
+} from '../types/finance.js';
+import { DEFAULT_CATEGORIES } from '../data/categories.js';
+import { applyGoalContribution, fromCents, toCents } from '../utils/financeMath.js';
 
 export interface ServerFinanceStore {
   readonly userId: string;

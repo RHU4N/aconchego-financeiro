@@ -98,7 +98,10 @@ export function createAuthMiddleware(customVerifier?: TokenVerifier) {
       (req as AuthenticatedRequest).auth = verified;
       return next();
     } catch (err) {
-      console.error('Erro na verificação de sessão:', err);
+      console.error(
+        'Erro na verificação de sessão:',
+        err instanceof Error ? err.message : 'erro desconhecido'
+      );
       return res.status(401).json({
         error: 'Não foi possível validar sua sessão.',
       });

@@ -52,6 +52,7 @@ sequenceDiagram
 - **Confirmação humana obrigatória:** Nenhuma ferramenta `propose*` altera `transactions`, `budgets`, `financial_goals` ou `goal_contributions`. A alteração só ocorre via `/api/agent/confirm` após clique explícito do usuário.
 - **Idempotência:** Cada operação recebe um `idempotency_key` único. A reivindicação otimista em `agent_operations` (`.eq('status', 'pending_confirmation')`) garante que uma segunda requisição retorne HTTP `409 Conflict` sem duplicar lançamentos.
 - **Limites de execução:** Máximo de 3 rodadas de function calling e 6 chamadas de ferramenta por turno, timeout de 30s e rate limiting (`SlidingWindowRateLimiter`).
+- **Proteção contra Prompt Injection e sanitização de logs:** caracteres de controle são removidos da entrada do usuário; descrições/notas e textos lidos em comprovantes são explicitamente isolados como dados não confiáveis nas instruções do sistema; erros internos não registram payloads financeiros ou tokens nos logs do servidor.
 - **Conformidade:** O agente não recomenda investimentos ou produtos financeiros específicos e anexa aviso educacional (`EDUCATIONAL_DISCLAIMER`) em análises e planos de orçamento.
 
 ## 4. Scanner Inteligente de Comprovantes (`src/server/receiptScanner.ts`)

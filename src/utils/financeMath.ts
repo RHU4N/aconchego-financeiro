@@ -1,4 +1,4 @@
-import { CategoryBudget, PiggyBankGoal, Transaction } from '../types/finance';
+import { CategoryBudget, PiggyBankGoal, Transaction } from '../types/finance.js';
 
 /**
  * Converte um valor monetário em reais para centavos inteiros para evitar erros de ponto flutuante.

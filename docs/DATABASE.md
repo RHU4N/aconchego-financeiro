@@ -1,6 +1,8 @@
 # Banco de Dados, Segurança (RLS) e Storage — Aconchego Finanças
 
-O esquema relacional está versionado na migration [`supabase/migrations/20261117000001_initial_schema.sql`](../supabase/migrations/20261117000001_initial_schema.sql).
+O esquema relacional está versionado nas migrations:
+- [`supabase/migrations/20261117000001_initial_schema.sql`](../supabase/migrations/20261117000001_initial_schema.sql) — schema inicial, RLS, triggers de imutabilidade/atomicidade e buckets privados.
+- [`supabase/migrations/20261118000002_security_advisors_hardening.sql`](../supabase/migrations/20261118000002_security_advisors_hardening.sql) — hardening para Security & Performance Advisors do Supabase (`SET search_path = public` em funções, políticas RLS com `(select auth.uid())` para evitar `auth_rls_initplan` e índices adicionais de chaves estrangeiras).
 
 ## 1. Modelo Entidade-Relacionamento
 
