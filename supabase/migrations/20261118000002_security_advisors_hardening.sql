@@ -15,6 +15,7 @@ ALTER FUNCTION public.prevent_user_id_change() SET search_path = public;
 ALTER FUNCTION public.prevent_profile_id_change() SET search_path = public;
 ALTER FUNCTION public.apply_goal_contribution_trigger() SET search_path = public;
 ALTER FUNCTION public.handle_new_user() SET search_path = public;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 
 -- ------------------------------------------------------------------------------
 -- 2. Índices de chaves estrangeiras (Performance Advisor: unindexed_foreign_keys)

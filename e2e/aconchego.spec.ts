@@ -158,17 +158,4 @@ test.describe('Aconchego Finanças — Testes Ponta a Ponta Reais (Navegador)', 
     expect(errors).toEqual([]);
   });
 
-  test('5. Integração REAL Supabase Auth + Gemini API (executado somente com credenciais reais)', async () => {
-    const hasRealSupabase = Boolean(
-      process.env.VITE_SUPABASE_URL &&
-        process.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
-        !process.env.VITE_SUPABASE_URL.includes('SEU-PROJETO')
-    );
-    const hasRealGemini = Boolean(process.env.GEMINI_API_KEY);
-
-    test.skip(
-      !hasRealSupabase || !hasRealGemini,
-      'NÃO VALIDADO: requer VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY e GEMINI_API_KEY reais configurados.'
-    );
-  });
 });

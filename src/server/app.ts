@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import {
   AuthenticatedRequest,
   TokenVerifier,
@@ -52,6 +52,7 @@ function defaultStoreFactory(req: AuthenticatedRequest): ServerFinanceStore {
 
 export function createApiApp(options: CreateApiAppOptions = {}): Express {
   const app = express();
+  app.disable('x-powered-by');
 
   // Compatibilidade com runtimes serverless (ex: Vercel) que já fazem parse de req.body
   app.use((req, _res, next) => {
@@ -62,6 +63,15 @@ export function createApiApp(options: CreateApiAppOptions = {}): Express {
   });
 
   app.use(express.json({ limit: '12mb' }));
+  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === 'entity.parse.failed') {
+      return res.status(400).json({ error: 'Corpo JSON inválido.' });
+    }
+    if (err?.type === 'entity.too.large') {
+      return res.status(413).json({ error: 'Arquivo ou requisição acima do limite permitido.' });
+    }
+    return next(err);
+  });
 
   const authMiddleware = createAuthMiddleware(options.verifyToken);
   const resolveStore = options.storeFactory || defaultStoreFactory;
@@ -113,10 +123,7 @@ export function createApiApp(options: CreateApiAppOptions = {}): Express {
             ...(err.details || {}),
           });
         }
-        console.error(
-          'Erro inesperado no scanner:',
-          err instanceof Error ? err.message : 'erro desconhecido'
-        );
+        console.error('Erro inesperado no scanner.');
         return res.status(500).json({
           error: 'Erro interno ao processar comprovante.',
         });
@@ -138,10 +145,7 @@ export function createApiApp(options: CreateApiAppOptions = {}): Express {
         if (err instanceof AgentHttpError) {
           return res.status(err.statusCode).json({ error: err.message });
         }
-        console.error(
-          'Erro no Assistente Financeiro:',
-          err instanceof Error ? err.message : 'erro desconhecido'
-        );
+        console.error('Erro no Assistente Financeiro.');
         return res.status(500).json({
           error: 'Não foi possível processar sua pergunta no momento.',
         });

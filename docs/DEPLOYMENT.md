@@ -16,7 +16,7 @@ Execute as migrations versionadas em ordem cronológica:
 - **Via Supabase CLI:**
   ```bash
   npx supabase link --project-ref SEU_PROJECT_REF
-  npx supabase db push
+  # Confira o histórico e use migration up com alvo remoto explícito conforme sua versão do CLI.
   ```
 - **Via SQL Editor (Painel Supabase):**
   Cole e execute primeiro `20261117000001_initial_schema.sql` e em seguida `20261118000002_security_advisors_hardening.sql`.
@@ -56,7 +56,11 @@ Passos no painel da Vercel:
 3. Cadastre as 5 variáveis de ambiente para **Production** e **Preview**.
 4. Gere primeiro um **Preview Deployment** e valide os critérios de segurança, banco e IA antes de promover para produção.
 
-### Estado atual do Preview na Vercel
-- **Projeto Vercel**: `rhu4ns-projects/aconchego-financeiro`
-- **URL de Preview**: `https://aconchego-financeiro-9vls9qn3r-rhu4ns-projects.vercel.app` (Deployment `dpl_Dtfg4Z79ogBiyzs2s8YuZExMutkV`)
-- **Pendências antes da promoção para Production**: configurar no projeto Vercel e no `.env` as chaves reais `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` e `APP_URL`, além de autorizar e aplicar as 2 migrations no projeto Supabase dedicado ao Aconchego Finanças.
+### Estado auditado em 18/11/2026
+
+- Projeto existente: `rhu4ns-projects/aconchego-financeiro`, ligado ao fork `RHU4N/aconchego-financeiro`; Production Branch `main`, raiz do repositório, Vite, build `npm run build`, saída `dist`.
+- As cinco variáveis essenciais existem separadamente em Production e Preview. URL Supabase de Production corresponde a `fhrmqspsxnodlftunsfa`, modelo `gemini-flash-lite-latest` e APP_URL `https://aconchego-financeiro-zeta.vercel.app`. Segredos não são copiados entre ambientes.
+- Três migrations aplicadas, incluindo `20261118034542_atomic_agent_confirmation.sql`, autorizada especificamente. TaskMind não foi acessado.
+- Login e integrações foram validados com contas sintéticas e JWT comum. Cadastro/recuperação via e-mail e SMTP dedicado continuam sem validação de ponta a ponta.
+- IA sem login demo desativada por padrão; `ENABLE_DEMO_AI` é opcional e deve permanecer falso para uso público.
+- Para publicar, construa para Production sem atribuir domínios, valide e promova essa mesma build. Resultado e URL final em [RELEASE.md](RELEASE.md).

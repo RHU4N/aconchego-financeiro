@@ -2,7 +2,7 @@
 
 ## 1. Arquitetura do Agente (`src/server/agentService.ts`)
 
-O Assistente Financeiro utiliza o SDK oficial `@google/genai` (`^3.4.0`) no backend, com **function calling real** controlado por schemas `zod` (`.strict()`) e modelo configurável via `GEMINI_MODEL` (padrão: `gemini-2.5-flash`).
+O Assistente Financeiro utiliza o SDK oficial `@google/genai` (`^3.4.0`, `apiVersion: 'v1beta'`) no backend, com **function calling real** controlado por schemas `zod` (`.strict()`), modelo configurável via `GEMINI_MODEL` (padrão: `gemini-2.5-flash`) e fallback automático para `gemini-flash-lite-latest` em respostas `404`/`503` de modelo indisponível ou alta demanda.
 
 ### Fluxo de Execução
 
@@ -26,7 +26,7 @@ sequenceDiagram
   API-->>UI: Exibe cartão com argumentos exatos
   User->>UI: Clica em "Confirmar e Executar"
   UI->>API: POST /api/agent/confirm { operationId, action: "confirm" }
-  API->>DB: Claim atômico + INSERT em transactions (idempotente)
+  API->>DB: RPC confirm_agent_operation: lock + mutação + status na mesma transação
 ```
 
 ## 2. Catálogo das 11 Ferramentas
@@ -50,7 +50,8 @@ sequenceDiagram
 - **Isolamento de proprietário:** O `userId` é extraído exclusivamente do JWT validado em `authMiddleware.ts`. Qualquer tentativa de enviar `userId`, `user_id` ou `ownerId` nos argumentos de ferramenta é bloqueada por `assertNoOwnerOverride` e por `.strict()` nos schemas Zod.
 - **Cálculos determinísticos:** Somas, subtrações, percentuais e saldos são sempre calculados em `src/utils/financeMath.ts` usando centavos inteiros.
 - **Confirmação humana obrigatória:** Nenhuma ferramenta `propose*` altera `transactions`, `budgets`, `financial_goals` ou `goal_contributions`. A alteração só ocorre via `/api/agent/confirm` após clique explícito do usuário.
-- **Idempotência:** Cada operação recebe um `idempotency_key` único. A reivindicação otimista em `agent_operations` (`.eq('status', 'pending_confirmation')`) garante que uma segunda requisição retorne HTTP `409 Conflict` sem duplicar lançamentos.
+- **Atomicidade e idempotência:** a RPC `confirm_agent_operation` usa `SELECT FOR UPDATE`, verifica proprietário e status e efetua a mutação e o registro de execução na mesma transação. Uma falha desfaz tudo; confirmações concorrentes resultam em uma execução e HTTP `409` para a repetição. A função é `SECURITY INVOKER`, mantém RLS e só concede `EXECUTE` a `authenticated`.
+- **Demonstração:** o consumo de Gemini sem login fica desativado por padrão. `ENABLE_DEMO_AI=true` permite ativá-lo explicitamente; o restante da interface demo continua disponível sem login.
 - **Limites de execução:** Máximo de 3 rodadas de function calling e 6 chamadas de ferramenta por turno, timeout de 30s e rate limiting (`SlidingWindowRateLimiter`).
 - **Proteção contra Prompt Injection e sanitização de logs:** caracteres de controle são removidos da entrada do usuário; descrições/notas e textos lidos em comprovantes são explicitamente isolados como dados não confiáveis nas instruções do sistema; erros internos não registram payloads financeiros ou tokens nos logs do servidor.
 - **Conformidade:** O agente não recomenda investimentos ou produtos financeiros específicos e anexa aviso educacional (`EDUCATIONAL_DISCLAIMER`) em análises e planos de orçamento.
@@ -60,6 +61,6 @@ sequenceDiagram
 1. Aceita imagens **JPG, PNG e WebP** até **8 MB**.
 2. Valida os **magic bytes reais** do buffer decodificado (`detectImageMimeFromMagicBytes`), rejeitando arquivos falsificados ou incompatíveis (HTTP 415/400).
 3. Calcula o hash **SHA-256** do arquivo e bloqueia importações repetidas (HTTP 409 + constraint `UNIQUE (user_id, file_hash)` no banco).
-4. Envia a imagem ao Gemini configurado via `GEMINI_MODEL` com schema estruturado e timeout de 25s.
+4. Envia a imagem ao Gemini (`apiVersion: 'v1beta'`) configurado via `GEMINI_MODEL` (com contingência automática em `gemini-flash-lite-latest`) usando schema estruturado e timeout de 25s.
 5. Rejeita documentos ilegíveis ou não financeiros (HTTP 422) e lista eventuais campos incertos em `uncertainFields`.
 6. O frontend (`ScanReceiptView.tsx`) exibe uma **prévia editável** com destaque para os campos incertos e **exige confirmação humana** antes de enviar a imagem ao bucket privado e gravar a transação.

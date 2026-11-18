@@ -2,7 +2,9 @@
 
 O esquema relacional está versionado nas migrations:
 - [`supabase/migrations/20261117000001_initial_schema.sql`](../supabase/migrations/20261117000001_initial_schema.sql) — schema inicial, RLS, triggers de imutabilidade/atomicidade e buckets privados.
-- [`supabase/migrations/20261118000002_security_advisors_hardening.sql`](../supabase/migrations/20261118000002_security_advisors_hardening.sql) — hardening para Security & Performance Advisors do Supabase (`SET search_path = public` em funções, políticas RLS com `(select auth.uid())` para evitar `auth_rls_initplan` e índices adicionais de chaves estrangeiras).
+- [`supabase/migrations/20261118000002_security_advisors_hardening.sql`](../supabase/migrations/20261118000002_security_advisors_hardening.sql) — hardening para Security & Performance Advisors do Supabase (`SET search_path = public` em funções, `REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated`, políticas RLS com `(select auth.uid())` para evitar `auth_rls_initplan` e índices adicionais de chaves estrangeiras).
+
+> **Estado no Supabase remoto (`RHU4N's Project` / `fhrmqspsxnodlftunsfa`):** ambas as migrations aplicadas e registradas em `supabase_migrations.schema_migrations`; **0 alertas no Security Advisor** (`get_advisors`); triggers (`on_auth_user_created`, `apply_goal_contribution_trigger`, `prevent_user_id_change`), buckets privados (`receipts`, `goal-images`, `public = false`) e isolamento estrito entre duas contas testados diretamente no PostgreSQL 17.
 
 ## 1. Modelo Entidade-Relacionamento
 
@@ -52,6 +54,12 @@ Todos os valores monetários utilizam `numeric(14,2)` com constraints `CHECK` no
 - Buckets criados: `receipts` e `goal-images`, ambos configurados com `public = false`, limite de `8 MB` (`8388608` bytes) e MIME types restritos a `image/jpeg`, `image/png` e `image/webp`.
 - Políticas em `storage.objects` permitem `SELECT`, `INSERT`, `UPDATE` e `DELETE` somente quando `(storage.foldername(name))[1] = auth.uid()::text`.
 - O frontend gera URLs assinadas com expiração de 1 hora (`createSignedUrl(path, 3600)`) para exibição das miniaturas e ampliação no lightbox.
+
+### Confirmação transacional e integridade adicional
+
+A migration `20261118034542_atomic_agent_confirmation.sql`, aplicada com autorização ao projeto `fhrmqspsxnodlftunsfa`, acrescenta a RPC `confirm_agent_operation`. Ela bloqueia a proposta e grava a mutação e o status na mesma transação, sem `SECURITY DEFINER` nem chave privilegiada. Políticas restritivas verificam o proprietário da conversa/operação e o prefixo do caminho do recibo. Contribuições não podem ser apagadas isoladamente; excluir o cofrinho ainda remove seu histórico por cascata.
+
+O arquivo local foi alinhado à versão `20261118034542` registrada pelo MCP. Não reaplique migrations já registradas. Os testes em `supabase/tests/financial_integrity.sql` são exclusivamente para banco local descartável e terminam com `ROLLBACK`.
 
 ## 5. Limites de E-mail (SMTP) do Supabase Auth
 

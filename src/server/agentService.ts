@@ -26,7 +26,11 @@ import {
   suggestBudgetPlanArgsSchema,
 } from './schemas.js';
 import { ServerFinanceStore } from './dataStore.js';
-import { getConfiguredGeminiModel } from './receiptScanner.js';
+import {
+  FALLBACK_GEMINI_MODEL,
+  getConfiguredGeminiModel,
+  shouldFallbackGeminiModel,
+} from './receiptScanner.js';
 import {
   addMoney,
   calculateBudgetStatuses,
@@ -707,8 +711,8 @@ Regras obrigatórias de conduta:
     },
   ];
 
-  const model = getConfiguredGeminiModel();
-  const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+  let activeModel = getConfiguredGeminiModel();
+  const ai = apiKey ? new GoogleGenAI({ apiKey, apiVersion: 'v1beta' }) : null;
 
   const toolTraces: AgentToolCallTrace[] = [];
   const proposals: AgentOperationProposal[] = [];
@@ -727,7 +731,7 @@ Regras obrigatórias de conduta:
 
       if (deps.runModelTurn) {
         const res = await deps.runModelTurn({
-          model,
+          model: activeModel,
           systemInstruction,
           contents,
           tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS }],
@@ -742,15 +746,32 @@ Regras obrigatórias de conduta:
             parts: (functionCalls || []).map((fc) => ({ functionCall: fc })),
           } as Content);
       } else {
-        const response = await ai!.models.generateContent({
-          model,
-          contents,
-          config: {
-            systemInstruction,
-            tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS }],
-            abortSignal: controller.signal,
-          },
-        });
+        const callAgentModel = (targetModel: string) =>
+          ai!.models.generateContent({
+            model: targetModel,
+            contents,
+            config: {
+              systemInstruction,
+              tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS }],
+              abortSignal: controller.signal,
+            },
+          });
+
+        let response;
+        try {
+          response = await callAgentModel(activeModel);
+        } catch (firstErr: unknown) {
+          if (
+            !controller.signal.aborted &&
+            activeModel !== FALLBACK_GEMINI_MODEL &&
+            shouldFallbackGeminiModel(firstErr)
+          ) {
+            activeModel = FALLBACK_GEMINI_MODEL;
+            response = await callAgentModel(activeModel);
+          } else {
+            throw firstErr;
+          }
+        }
         modelText = (response.text ?? '').trim();
         functionCalls = response.functionCalls;
         modelContent = response.candidates?.[0]?.content;
@@ -848,7 +869,7 @@ Regras obrigatórias de conduta:
     if (msg.includes('API_KEY_INVALID') || msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
       throw new AgentHttpError(403, 'Erro de autenticação com a API Gemini no servidor.');
     }
-    throw new AgentHttpError(502, `Falha ao consultar o Assistente IA: ${msg}`);
+    throw new AgentHttpError(502, 'Falha ao consultar o Assistente IA. Tente novamente.');
   } finally {
     clearTimeout(timeout);
   }

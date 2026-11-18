@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ScannedReceiptResponseSchema,
+  AgentChatRequestSchema,
   assertNoOwnerOverride,
   detectImageMimeFromMagicBytes,
   listTransactionsArgsSchema,
@@ -35,6 +36,12 @@ describe('Validação de MIME type real por magic bytes', () => {
 });
 
 describe('Validação de schemas do Scanner e das ferramentas do Agente', () => {
+  it('valida o mês inteiro sem aceitar prefixos, sufixos ou meses impossíveis', () => {
+    for (const currentMonth of ['2026-11-extra', 'xall', '2026-99', '2026-00']) {
+      expect(AgentChatRequestSchema.safeParse({ message: 'Resumo', currentMonth }).success).toBe(false);
+    }
+    expect(AgentChatRequestSchema.safeParse({ message: 'Resumo', currentMonth: '2026-11' }).success).toBe(true);
+  });
   it('valida resposta estruturada do scanner incluindo campos incertos', () => {
     const valid = ScannedReceiptResponseSchema.safeParse({
       isValidDocument: true,

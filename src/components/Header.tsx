@@ -76,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Zone 2: Navigation links */}
-          <nav aria-label="Navegação Principal" className="hidden md:flex items-center gap-1 md:gap-2 lg:gap-4 text-xs lg:text-sm font-medium overflow-x-auto">
+          <nav aria-label="Navegação Principal" className="hidden md:flex items-center gap-1 md:gap-1.5 lg:gap-2 2xl:gap-4 text-xs lg:text-sm font-medium overflow-x-auto">
             <button
               type="button"
               onClick={() => onTabChange('overview')}
@@ -147,11 +147,12 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onNewTransaction}
+              aria-label="Nova Transação"
               className="flex items-center gap-1.5 px-3 sm:px-3.5 lg:px-4 py-1.5 sm:py-2 text-xs lg:text-sm font-semibold text-white bg-[#274A3C] hover:bg-[#1E3B30] rounded-full shadow-sm transition-all duration-150 active:scale-95 whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4 shrink-0" />
-              <span className="hidden lg:inline">Nova Transação</span>
-              <span className="lg:hidden">Novo</span>
+              <span className="hidden 2xl:inline">Nova Transação</span>
+              <span className="2xl:hidden">Novo</span>
             </button>
 
             <div

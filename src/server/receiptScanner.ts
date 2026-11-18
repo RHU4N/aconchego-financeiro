@@ -12,10 +12,26 @@ import { ScannedReceiptResult, UncertainReceiptField } from '../types/finance.js
 import { fromCents, toCents } from '../utils/financeMath.js';
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const FALLBACK_GEMINI_MODEL = 'gemini-flash-lite-latest';
 const SCAN_TIMEOUT_MS = 25_000;
 
 export function getConfiguredGeminiModel(): string {
   return (process.env.GEMINI_MODEL || '').trim() || DEFAULT_GEMINI_MODEL;
+}
+
+/**
+ * Indica se o erro retornado pelo Gemini justifica nova tentativa no modelo de contingência.
+ */
+export function shouldFallbackGeminiModel(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err || '');
+  return (
+    message.includes('404') ||
+    message.includes('NOT_FOUND') ||
+    message.includes('no longer available') ||
+    message.includes('503') ||
+    message.includes('UNAVAILABLE') ||
+    message.includes('high demand')
+  );
 }
 
 export function normalizeCategory(category: string): string {
@@ -202,29 +218,45 @@ Regras obrigatórias:
       });
       rawText = (customRes.text || '').trim();
     } else {
-      const ai = new GoogleGenAI({ apiKey });
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model,
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: detectedMime,
-                data: cleanBase64,
+      const ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
+      const callScannerModel = (targetModel: string) =>
+        ai.models.generateContent({
+          model: targetModel,
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: detectedMime,
+                  data: cleanBase64,
+                },
               },
-            },
-            {
-              text: `Leia este documento financeiro e extraia os dados em JSON. Data de referência: ${fallbackDate}.`,
-            },
-          ],
-        },
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema,
-          abortSignal: controller.signal,
-        },
-      });
+              {
+                text: `Leia este documento financeiro e extraia os dados em JSON. Data de referência: ${fallbackDate}.`,
+              },
+            ],
+          },
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+            responseSchema,
+            abortSignal: controller.signal,
+          },
+        });
+
+      let response: GenerateContentResponse;
+      try {
+        response = await callScannerModel(model);
+      } catch (firstErr: unknown) {
+        if (
+          !controller.signal.aborted &&
+          model !== FALLBACK_GEMINI_MODEL &&
+          shouldFallbackGeminiModel(firstErr)
+        ) {
+          response = await callScannerModel(FALLBACK_GEMINI_MODEL);
+        } else {
+          throw firstErr;
+        }
+      }
       rawText = (response.text ?? '').trim();
     }
   } catch (err: unknown) {
@@ -252,7 +284,7 @@ Regras obrigatórias:
         'Limite de cota da API Gemini atingido temporariamente. Aguarde alguns instantes.'
       );
     }
-    throw new ScannerHttpError(502, `Falha ao analisar o documento: ${message}`);
+    throw new ScannerHttpError(502, 'Falha ao analisar o documento com a IA. Tente novamente.');
   } finally {
     clearTimeout(timeout);
   }

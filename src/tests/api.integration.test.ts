@@ -192,6 +192,47 @@ describe('Integração API — Autenticação, Scanner e Agente Financeiro', () 
     expect(chatRes.status).toBe(401);
   });
 
+  it('rejeita JSON malformado sem expor stack ou payload', async () => {
+    const { app } = buildApp();
+    const response = await request(app).post('/api/agent/chat')
+      .set('Content-Type', 'application/json').send('{"message":"segredo');
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'Corpo JSON inválido.' });
+    expect(response.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('bloqueia consumo público da IA por uma sessão demo conhecida', async () => {
+    const { app } = buildApp();
+    const previous = process.env.ENABLE_DEMO_AI;
+    delete process.env.ENABLE_DEMO_AI;
+    try {
+      const response = await request(app).post('/api/agent/chat')
+        .set('Authorization', 'Bearer demo-session').set('x-aconchego-demo', 'true')
+        .send({ message: 'Olá' });
+      expect(response.status).toBe(403);
+    } finally {
+      if (previous === undefined) delete process.env.ENABLE_DEMO_AI;
+      else process.env.ENABLE_DEMO_AI = previous;
+    }
+  });
+
+  it('não devolve mensagens internas do provedor Gemini ao cliente', async () => {
+    const secret = 'provider-secret-payload';
+    const app = createApiApp({
+      verifyToken: makeTestAuthVerifier(), storeFactory: () => storeA,
+      scannerDeps: { generateContent: async () => { throw new Error(secret); } },
+      agentDeps: { runModelTurn: async () => { throw new Error(secret); } },
+    });
+    const scan = await request(app).post('/api/receipts/scan')
+      .set('Authorization', 'Bearer token-user-a').send({ imageBase64: VALID_JPEG_B64 });
+    expect(scan.status).toBe(502);
+    expect(JSON.stringify(scan.body)).not.toContain(secret);
+    const chat = await request(app).post('/api/agent/chat')
+      .set('Authorization', 'Bearer token-user-a').send({ message: 'Resumo' });
+    expect(chat.status).toBe(502);
+    expect(JSON.stringify(chat.body)).not.toContain(secret);
+  });
+
   it('scanner rejeita arquivo falsificado (415), documento ilegível (422) e imagem duplicada (409)', async () => {
     const fakeSvgB64 = Buffer.from('<svg>not-an-image</svg>', 'utf8').toString('base64');
     const { app } = buildApp();

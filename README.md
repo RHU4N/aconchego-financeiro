@@ -33,7 +33,7 @@ Ferramentas financeiras pessoais frequentemente sofrem de dois extremos: planilh
 - **Autenticação completa (`AuthView`)**: Cadastro, login, logout, recuperação de senha, atualização de senha via link de recuperação e **Modo Demonstração** voluntário (dados fictícios de `initialData.ts` nunca são importados para contas reais novas).
 - **Persistência Supabase + Storage Privado (`financeRepository.ts`)**: Substituição do armazenamento exclusivo em `localStorage` por PostgreSQL com RLS, URLs assinadas temporárias e proteção anti-duplicidade via `file_hash` SHA-256 e `idempotency_key`.
 - **Correções estruturais**: Mês inicial dinâmico (`getCurrentYearMonth()`), empacotamento estático de imagens (`src/utils/assets.ts`), filtro por forma de pagamento e ordenação por data/valor no extrato, exclusão de orçamentos, bloqueio de resgate acima do saldo e histórico de movimentações (`goal_contributions`) nos cofrinhos.
-- **Scanner Gemini corrigido**: Substituição do modelo `gemini-4-hydrogen` por `GEMINI_MODEL` (padrão `gemini-2.5-flash`), validação de magic bytes (JPG/PNG/WebP até 8 MB), timeout de 25s, sinalização de `uncertainFields` e remoção do registro automático sem confirmação.
+- **Scanner Gemini corrigido**: Substituição do modelo `gemini-4-hydrogen` por `GEMINI_MODEL` (padrão `gemini-2.5-flash`, com contingência automática para `gemini-flash-lite-latest`), cliente `@google/genai` com `apiVersion: 'v1beta'`, validação de magic bytes (JPG/PNG/WebP até 8 MB), timeout de 25s, sinalização de `uncertainFields` e remoção do registro automático sem confirmação.
 - **Novo Assistente Financeiro IA (`AgentAssistantView`)**: Interface conversacional com histórico persistente, 11 ferramentas reais no servidor e cartão de confirmação com argumentos exatos.
 
 ## 4. Agente Gemini e Chamadas de Ferramentas
@@ -43,7 +43,7 @@ O agente (`src/server/agentService.ts`) utiliza **function calling** oficial do 
 - **Consultas e análises determinísticas**: `getFinancialSummary`, `listTransactions`, `listBudgets`, `listFinancialGoals`, `analyzeSpending`, `suggestBudgetPlan`.
 - **Propostas com confirmação humana**: `proposeCreateTransaction`, `proposeUpdateTransaction`, `proposeDeleteTransaction`, `proposeUpdateBudget`, `proposeGoalContribution`.
 
-Cenários suportados e validados:
+Cenários suportados, cobertos por testes determinísticos:
 1. *"Quanto gastei com alimentação neste mês?"*
 2. *"Registre uma compra de R$ 85,50 no supermercado, paga no Pix."*
 3. *"Em quais categorias estou gastando mais?"*
@@ -90,7 +90,17 @@ A aplicação organiza-se nas seguintes telas responsivas (desktop, tablet e mob
 7. **Cofrinhos (`PiggyBanksView`)** — Metas com fotos opcionais, depósitos/resgates validados e histórico de movimentações.
 8. **Comprovantes (`ReceiptsGalleryView`)** — Galeria de recibos vinculados com visualização ampliada.
 
-> **Nota:** Nenhuma captura PNG estática foi gerada automaticamente neste repositório; após publicar o Preview na Vercel ou rodar localmente com dados de demonstração, recomenda-se anexar screenshots reais das telas em `docs/screenshots/`.
+> **Capturas reais** geradas com Playwright a partir da aplicação em execução, no **Modo Demonstração** (somente dados fictícios de `initialData.ts`, sem nenhuma informação financeira real).
+
+| Autenticação | Visão Geral |
+|---|---|
+| ![Tela de autenticação](docs/screenshots/01-autenticacao.png) | ![Visão geral](docs/screenshots/02-visao-geral.png) |
+| **Extrato** | **Scanner de comprovantes** |
+| ![Extrato](docs/screenshots/03-extrato.png) | ![Scanner](docs/screenshots/04-scanner.png) |
+| **Orçamentos** | **Cofrinhos** |
+| ![Orçamentos](docs/screenshots/05-orcamentos.png) | ![Cofrinhos](docs/screenshots/06-cofrinhos.png) |
+| **Assistente Financeiro IA** | **Mobile (390px)** |
+| ![Assistente IA](docs/screenshots/07-assistente-ia.png) | ![Mobile](docs/screenshots/08-mobile.png) |
 
 ## 8. Estrutura do Repositório
 
@@ -155,13 +165,13 @@ Preencha:
 - `VITE_SUPABASE_URL` — URL do projeto Supabase
 - `VITE_SUPABASE_PUBLISHABLE_KEY` — Publishable / Anon Key do Supabase
 - `GEMINI_API_KEY` — Chave privada da Gemini API (apenas no servidor)
-- `GEMINI_MODEL` — Modelo oficial Gemini (ex: `gemini-2.5-flash`)
+- `GEMINI_MODEL` — Modelo oficial Gemini (ex: `gemini-flash-lite-latest` ou `gemini-2.5-flash`, com contingência automática para `gemini-flash-lite-latest` em `404`/`503`)
 - `APP_URL` — URL da aplicação (`http://localhost:3000` localmente)
 
 ## 12. Como Instalar e Executar Localmente
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -180,11 +190,13 @@ Outros scripts disponíveis:
 1. Pelo CLI do Supabase:
    ```bash
    npx supabase link --project-ref SEU_PROJECT_REF
-   npx supabase db push
+   # Confira a versão e use o comando de migration adequado ao alvo explícito.
+   # Em projetos existentes, não reaplique migrations já registradas.
    ```
 2. Ou copie e execute em ordem no **SQL Editor** do painel Supabase:
    - [`supabase/migrations/20261117000001_initial_schema.sql`](supabase/migrations/20261117000001_initial_schema.sql)
    - [`supabase/migrations/20261118000002_security_advisors_hardening.sql`](supabase/migrations/20261118000002_security_advisors_hardening.sql)
+   - [`supabase/migrations/20261118034542_atomic_agent_confirmation.sql`](supabase/migrations/20261118034542_atomic_agent_confirmation.sql)
 
 ## 14. Como Testar
 
@@ -202,37 +214,33 @@ Mais detalhes sobre escopo de testes, E2E e mocks em [`docs/TESTING.md`](docs/TE
 1. Conecte o repositório `RHU4N/aconchego-financeiro` (fork de `medeirosfbia/aconchego-financeiro`) na Vercel com **Framework Preset: Vite**, **Build Command: `npm run build`** e **Output Directory: `dist`**.
 2. Cadastre as 5 variáveis de ambiente do `.env.example` nas configurações do projeto (`Preview` e `Production`).
 3. Configure `Site URL` e `Redirect URLs` no Supabase Auth com o domínio gerado pela Vercel.
-4. Preview atualmente publicado (sem variáveis de produção configuradas): `https://aconchego-financeiro-9vls9qn3r-rhu4ns-projects.vercel.app`.
+4. Preview mais recente publicado com Supabase e Gemini configurados: `https://aconchego-financeiro-2si5igpjy-rhu4ns-projects.vercel.app`.
 
 Passo a passo detalhado em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## 16. Resultados Comprovados dos Testes
 
-Execuções verificadas neste ambiente após a última alteração de código:
-- **`npm run lint` (`tsc --noEmit`)**: aprovado com código de saída `0`.
-- **`npm test` (`vitest run`)**: **4 arquivos de teste, 28/28 testes aprovados**:
-  - `src/tests/financeMath.test.ts`: 9 testes aprovados (precisão em centavos, regra `paid` vs `pending`, orçamentos, cofrinhos, formatadores).
-  - `src/tests/schemas.test.ts`: 5 testes aprovados (magic bytes, schemas do scanner e das ferramentas do agente, bloqueio de `userId`).
-  - `src/tests/api.integration.test.ts`: 9 testes aprovados (auth 401, scanner 415/422/409/429/200, os 5 cenários do agente, idempotência 409, isolamento entre `user-a` e `user-b` e bloqueio de prompt injection tentando injetar `userId` alheio).
-  - `src/tests/app.ui.test.tsx`: 5 testes aprovados (AuthView, conta nova vazia com mês dinâmico, Modo Demonstração, revisão humana obrigatória no scanner e confirmação no Assistente IA).
-- **`npm run test:e2e` (`playwright test` em `http://127.0.0.1:3100`)**: **4 testes aprovados, 1 teste ignorado (skipped)** por ausência de credenciais reais (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`).
-- **`npm run build` (`vite build`)**: build concluído gerando `dist/index.html`, bundle JS/CSS e os assets em `dist/assets/`.
-- **Preview na Vercel (`https://aconchego-financeiro-9vls9qn3r-rhu4ns-projects.vercel.app` via `vercel curl`)**:
-  - `GET /api/health` → `HTTP 200` (`{"ok":true,"service":"aconchego-financas","geminiConfigured":false,"model":"gemini-2.5-flash",...}`)
-  - `HEAD /` e `GET /extrato` → `HTTP 200`
-  - `POST /api/agent/chat` e `POST /api/receipts/scan` sem autenticação → `HTTP 401 Unauthorized`
+Auditoria de 18/11/2026:
+- `npm ci`, `npm run lint`, `npm test` (**32/32**), `npm run build` e `npm run test:e2e` (**5/5**) aprovados.
+- O E2E real usa duas contas sintéticas confirmadas: login pela interface, CRUD e reload, orçamento, depósito/resgate, scanner Gemini com prévia editável, upload privado e bloqueio de leitura por outra conta e por anônimo.
+- Gemini real: `getFinancialSummary` e `proposeCreateTransaction`; nenhuma transação antes da confirmação; duas confirmações concorrentes retornam **200 e 409** e gravam um único lançamento.
+- Supabase: três migrations aplicadas em `fhrmqspsxnodlftunsfa`, RLS nas dez tabelas e buckets privados. Advisor sem erros de schema, com um aviso de proteção contra senhas vazadas desativada.
+- Vitest usa mocks; testes reais ficam em `e2e/live-integrations.spec.ts`. Sem credenciais de teste, esse teste é marcado **NÃO VALIDADO** e ignorado.
+- A confirmação no banco usa `confirm_agent_operation` com RLS, bloqueio de linha e rollback integral. Testes SQL locais também verificaram falha e rollback.
 
-## 17. Limitações Reais e Itens Não Validados ao Vivo
+## 17. Limitações Reais e Pendências
 
-- **Pendente de credenciais e autorização (`NÃO VALIDADO` ao vivo)**: este ambiente não possui `.env` preenchido com projeto Supabase dedicado ao Aconchego nem `GEMINI_API_KEY` real; além disso, as 2 migrations SQL ainda não foram aplicadas remotamente no Supabase por dependerem de autorização explícita e definição do projeto alvo. Testes ao vivo contra Supabase Auth/PostgreSQL/RLS/Storage e contra a API Gemini real permanecem pendentes.
-- **Testes com mocks**: os testes de integração e UI (`api.integration.test.ts` e `app.ui.test.tsx`) utilizam respostas Gemini simuladas e `InMemoryServerFinanceStore` para validar lógica, segurança e contratos sem depender de rede externa.
-- **Playwright no Preview URL protegido**: o Playwright contra a URL externa de Preview sem `VERCEL_BYPASS_TOKEN` é interceptado pela proteção SSO da Vercel; as rotas do Preview foram validadas com `vercel curl`.
-- **Escopo financeiro**: não há integração bancária real (Open Finance, Pix automático ou movimentação bancária); todos os lançamentos e cofrinhos representam controle financeiro pessoal.
-- **Dependências herdadas não utilizadas diretamente**: `motion` e `autoprefixer` permanecem em `package.json` desde o protótipo inicial (para eventual remoção apenas mediante confirmação), e `esbuild` foi atualizado de `^0.25.0` para `^0.28.0` para compatibilidade de peer dependency com `vite@8` no `npm`.
+- Cadastro por e-mail, recuperação de senha, SMTP dedicado e entrega de mensagens não foram validados de ponta a ponta. As contas E2E foram provisionadas pela API administrativa; todos os testes financeiros usam JWT comum e RLS.
+- Apenas duas das onze ferramentas foram chamadas com Gemini real nesta auditoria; as demais têm cobertura determinística com mocks.
+- O rate limiter reside na memória de cada instância; não é uma cota global entre funções Vercel.
+- O saldo inicial de um cofrinho é informado separadamente das contribuições. Upload em Storage e gravação de metadados/transação usam requisições distintas; podem exigir limpeza de órfãos em falhas parciais.
+- A interface demo funciona sem login; consumir IA nesse modo exige ativação explícita com `ENABLE_DEMO_AI=true`. O padrão protege a chave Gemini contra uso público sem conta.
+- Não há movimentação bancária real nem integração Open Finance.
+- Produção será considerada validada somente após o teste do deployment de Production; o estado final é registrado em [docs/RELEASE.md](docs/RELEASE.md).
 
 ## 18. Melhorias Futuras
 
-- Aplicar as migrations no projeto Supabase dedicado ao Aconchego Finanças e executar o teste E2E #5 (Supabase + Gemini ao vivo) após cadastrar credenciais reais no `.env` e na Vercel.
+- Configurar SMTP próprio no Supabase Auth (ex.: Resend) e promover o deploy da Vercel para Production com domínio final cadastrado nas Redirect URLs.
 - Suporte a gerenciamento customizado de categorias pela interface (`categories` já está modelada no PostgreSQL).
 - Recorrência programada de lançamentos fixos (aluguel, salário, assinaturas).
 - Relatórios comparativos multi-mês e metas de economia vinculadas a alertas de orçamento.

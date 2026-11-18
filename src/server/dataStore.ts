@@ -335,181 +335,34 @@ export class SupabaseServerFinanceStore implements ServerFinanceStore {
     conflict?: string;
     mutatedData?: Record<string, unknown>;
   }> {
-    const existing = await this.getOperationById(operationId);
-    if (!existing) {
-      throw new Error('Operação não encontrada ou sem permissão de acesso.');
-    }
-
-    if (existing.status !== 'pending_confirmation') {
-      return {
-        operation: existing,
-        conflict:
-          existing.status === 'executed'
-            ? 'Esta operação já foi confirmada e executada anteriormente.'
-            : 'Esta operação já foi encerrada e não pode ser executada novamente.',
-      };
-    }
-
-    if (action === 'cancel') {
-      const { data: cancelled, error } = await this.supabase
-        .from('agent_operations')
-        .update({ status: 'cancelled' })
-        .eq('id', operationId)
-        .eq('user_id', this.userId)
-        .eq('status', 'pending_confirmation')
-        .select('*')
-        .maybeSingle();
-
-      if (error) throw new Error(`Erro ao cancelar operação: ${error.message}`);
-      if (!cancelled) {
-        const latest = await this.getOperationById(operationId);
-        return {
-          operation: latest || existing,
-          conflict: 'A operação já foi processada anteriormente.',
-        };
+    // RPC SECURITY INVOKER: bloqueio da proposta, mutação e status em uma transação.
+    const { data, error } = await this.supabase.rpc('confirm_agent_operation', {
+      p_operation_id: operationId,
+      p_action: action,
+    });
+    if (error) {
+      if (error.code === 'PGRST202') {
+        throw new Error('Confirmação indisponível: a migration de confirmação atômica ainda não foi aplicada.');
       }
-      return {
-        operation: { ...existing, status: 'cancelled' },
-      };
+      throw new Error(error.message);
     }
-
-    // Reivindicação otimista: garante que apenas uma requisição concorrente execute
-    const { data: claimed, error: claimErr } = await this.supabase
-      .from('agent_operations')
-      .update({ status: 'executed', executed_at: new Date().toISOString() })
-      .eq('id', operationId)
-      .eq('user_id', this.userId)
-      .eq('status', 'pending_confirmation')
-      .select('*')
-      .maybeSingle();
-
-    if (claimErr) throw new Error(`Erro ao confirmar operação: ${claimErr.message}`);
-    if (!claimed) {
-      const latest = await this.getOperationById(operationId);
-      return {
-        operation: latest || existing,
-        conflict: 'Operação duplicada bloqueada: esta ação já está sendo ou já foi executada.',
-      };
-    }
-
-    const args = existing.arguments;
-    let mutatedData: Record<string, unknown> = {};
-
-    try {
-      if (existing.operationType === 'create_transaction') {
-        const { data: txRow, error: txErr } = await this.supabase
-          .from('transactions')
-          .insert({
-            user_id: this.userId,
-            description: String(args.description),
-            amount: fromCents(toCents(Number(args.amount))),
-            type: String(args.type),
-            category: String(args.category),
-            date: String(args.date),
-            payment_method: String(args.account),
-            status: String(args.status || 'paid'),
-            notes: args.notes ? String(args.notes) : null,
-            idempotency_key: existing.idempotencyKey,
-          })
-          .select('*')
-          .single();
-        if (txErr) throw new Error(txErr.message);
-        mutatedData = { transaction: txRow };
-      } else if (existing.operationType === 'update_transaction') {
-        const txId = String(args.transactionId);
-        const updates: Record<string, unknown> = {};
-        if (args.description !== undefined) updates.description = String(args.description);
-        if (args.amount !== undefined) updates.amount = fromCents(toCents(Number(args.amount)));
-        if (args.type !== undefined) updates.type = String(args.type);
-        if (args.category !== undefined) updates.category = String(args.category);
-        if (args.date !== undefined) updates.date = String(args.date);
-        if (args.account !== undefined) updates.payment_method = String(args.account);
-        if (args.status !== undefined) updates.status = String(args.status);
-        if (args.notes !== undefined) updates.notes = String(args.notes);
-
-        const { data: txRow, error: txErr } = await this.supabase
-          .from('transactions')
-          .update(updates)
-          .eq('id', txId)
-          .eq('user_id', this.userId)
-          .select('*')
-          .single();
-        if (txErr) throw new Error(txErr.message);
-        mutatedData = { transaction: txRow };
-      } else if (existing.operationType === 'delete_transaction') {
-        const txId = String(args.transactionId);
-        const { error: delErr } = await this.supabase
-          .from('transactions')
-          .delete()
-          .eq('id', txId)
-          .eq('user_id', this.userId);
-        if (delErr) throw new Error(delErr.message);
-        mutatedData = { deletedTransactionId: txId };
-      } else if (existing.operationType === 'update_budget') {
-        const cat = String(args.category);
-        const catMeta = DEFAULT_CATEGORIES.find((c) => c.name === cat);
-        const { data: bRow, error: bErr } = await this.supabase
-          .from('budgets')
-          .upsert(
-            {
-              user_id: this.userId,
-              category: cat,
-              period: String(args.period || 'monthly'),
-              limit_amount: fromCents(toCents(Number(args.limit))),
-              icon: catMeta?.icon || 'Receipt',
-              color: catMeta?.color || '#3F6253',
-              bg_color: catMeta?.bgColor || '#EEF3F0',
-            },
-            { onConflict: 'user_id,category,period' }
-          )
-          .select('*')
-          .single();
-        if (bErr) throw new Error(bErr.message);
-        mutatedData = { budget: bRow };
-      } else if (existing.operationType === 'goal_contribution') {
-        const goalId = String(args.goalId);
-        const contribType = String(args.type) as 'deposit' | 'withdraw';
-        const amount = fromCents(toCents(Number(args.amount)));
-        const { data: contribRow, error: cErr } = await this.supabase
-          .from('goal_contributions')
-          .insert({
-            user_id: this.userId,
-            goal_id: goalId,
-            type: contribType,
-            amount,
-            notes: args.notes ? String(args.notes) : 'Movimentação via Assistente IA',
-            idempotency_key: existing.idempotencyKey,
-          })
-          .select('*')
-          .single();
-        if (cErr) throw new Error(cErr.message);
-        mutatedData = { contribution: contribRow };
-      }
-
-      await this.supabase
-        .from('agent_operations')
-        .update({ result: mutatedData })
-        .eq('id', operationId)
-        .eq('user_id', this.userId);
-
-      return {
-        operation: {
-          ...existing,
-          status: 'executed',
-          executedAt: String(claimed.executed_at),
-        },
-        mutatedData,
-      };
-    } catch (execErr) {
-      const errorMessage =
-        execErr instanceof Error ? execErr.message : 'Falha ao executar operação no banco.';
-      await this.supabase
-        .from('agent_operations')
-        .update({ status: 'failed', error_message: errorMessage })
-        .eq('id', operationId)
-        .eq('user_id', this.userId);
-      throw new Error(errorMessage);
-    }
+    const row = data.operation;
+    return {
+      operation: {
+        id: String(row.id),
+        operationType: row.operation_type as AgentOperationType,
+        status: row.status as AgentOperationProposal['status'],
+        title: String(row.title),
+        summary: String(row.summary),
+        arguments: row.arguments || {},
+        idempotencyKey: String(row.idempotency_key),
+        createdAt: String(row.created_at),
+        executedAt: row.executed_at ? String(row.executed_at) : undefined,
+        errorMessage: row.error_message ? String(row.error_message) : undefined,
+      },
+      conflict: data.conflict,
+      mutatedData: data.mutatedData,
+    };
   }
 }
 

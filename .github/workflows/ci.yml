@@ -2,7 +2,7 @@ name: CI — Aconchego Finanças
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/finalizacao-cloud-e2e]
   pull_request:
     branches: [main]
 
@@ -22,7 +22,7 @@ jobs:
           cache: 'npm'
 
       - name: Instalar dependências
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Verificar tipagem TypeScript
         run: npm run lint
@@ -32,3 +32,9 @@ jobs:
 
       - name: Build de produção (Vite)
         run: npm run build
+
+      - name: Instalar Chromium para E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar E2E sem credenciais externas
+        run: npm run test:e2e

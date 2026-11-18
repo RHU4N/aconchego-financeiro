@@ -237,7 +237,7 @@ export const suggestBudgetPlanArgsSchema = z
 export const AgentChatRequestSchema = z.object({
   conversationId: z.string().min(1).max(120).optional(),
   message: z.string().trim().min(1).max(1500),
-  currentMonth: z.string().regex(/^\d{4}-\d{2}|all$/).optional(),
+  currentMonth: z.string().regex(/^(?:\d{4}-(?:0[1-9]|1[0-2])|all)$/).optional(),
   demoState: z
     .object({
       transactions: z.array(z.any()).max(500).optional(),

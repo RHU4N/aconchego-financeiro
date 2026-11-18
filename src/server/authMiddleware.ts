@@ -76,6 +76,11 @@ export function createAuthMiddleware(customVerifier?: TokenVerifier) {
 
     // Modo demonstração explícito: nunca acessa banco de usuários reais
     if (isDemoHeader && token === 'demo-session') {
+      if (process.env.ENABLE_DEMO_AI !== 'true') {
+        return res.status(403).json({
+          error: 'Entre na sua conta para usar o scanner e o Assistente IA.',
+        });
+      }
       (req as AuthenticatedRequest).auth = {
         userId: 'demo-user',
         email: 'demo@aconchego.local',
@@ -97,11 +102,8 @@ export function createAuthMiddleware(customVerifier?: TokenVerifier) {
 
       (req as AuthenticatedRequest).auth = verified;
       return next();
-    } catch (err) {
-      console.error(
-        'Erro na verificação de sessão:',
-        err instanceof Error ? err.message : 'erro desconhecido'
-      );
+    } catch {
+      console.error('Erro na verificação de sessão.');
       return res.status(401).json({
         error: 'Não foi possível validar sua sessão.',
       });
