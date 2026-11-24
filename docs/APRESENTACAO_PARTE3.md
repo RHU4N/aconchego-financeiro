@@ -2,7 +2,7 @@
 
 **Aplicação publicada (Production):** [aconchego-financeiro-zeta.vercel.app](https://aconchego-financeiro-zeta.vercel.app)  
 **Repositório (fork):** `https://github.com/RHU4N/aconchego-financeiro`  
-**Conta demonstrativa no Supabase Auth:** `rhuan3003@gmail.com` *(senha provisória mantida apenas em local privado — nunca gravar em repositório)*  
+**Conta demonstrativa no Supabase Auth:** `<e-mail da conta demonstrativa>` *(credenciais mantidas apenas em local privado / variáveis de ambiente — nunca gravar em repositório)*  
 **Comprovante sintético para testar o Scanner ao vivo:** [`docs/samples/comprovante-demo-scanner.png`](samples/comprovante-demo-scanner.png)
 
 ---
@@ -13,7 +13,7 @@
 |---|---|---|
 | **0:00 – 0:45** | **1. Objetivo do Aconchego** | Controle financeiro pessoal acolhedor (tons bege, verde floresta e terracota), sem planilhas complexas, separando gastos **efetivados (`paid`)** de **pendentes (`pending`)** para evitar falsos saldos. |
 | **0:45 – 1:30** | **2. Arquitetura Full Stack** | Frontend **React 19 + TypeScript + Vite + Tailwind v4**; backend **Express / Vercel Functions (`/api/*`)** validando JWT; **Supabase** (Auth, PostgreSQL 17 com RLS nas 10 tabelas, Storage privado com URLs assinadas) e **Google Gemini API (`@google/genai`)** exclusivamente no servidor. |
-| **1:30 – 2:10** | **3. Login Real** | Abrir [aconchego-financeiro-zeta.vercel.app](https://aconchego-financeiro-zeta.vercel.app), entrar com `rhuan3003@gmail.com` via **Supabase Auth verdadeiro**, confirmar ausência do banner de Modo Demonstração e carregamento dos dados persistidos. |
+| **1:30 – 2:10** | **3. Login Real** | Abrir [aconchego-financeiro-zeta.vercel.app](https://aconchego-financeiro-zeta.vercel.app), entrar com a conta demonstrativa configurada via **Supabase Auth verdadeiro**, confirmar ausência do banner de Modo Demonstração e carregamento dos dados persistidos. |
 | **2:10 – 3:00** | **4. Dashboard Financeiro** | Em **Novembro de 2026**: mostrar **Entradas Pagas `R$ 5.670,00`**, **Saídas Pagas `R$ 3.117,40`**, **Saldo do Período `R$ 2.552,60`** (mais `R$ 308,40` pendentes a pagar) e **Saldo Geral Efetivado `R$ 4.684,60`** (considerando Out/2026). |
 | **3:00 – 3:55** | **5. Extrato e Orçamentos** | No **Extrato**, filtrar por tipo/categoria/pagamento e mostrar lançamento com comprovante privado (`Supermercado Primavera`). Em **Orçamentos**, destacar o alerta amarelo de **Transporte (`89%` — R$ 285,50 / R$ 320,00)** e o alerta vermelho de **Lazer & Cultura (`116%` — R$ 290,00 / R$ 250,00)**. |
 | **3:55 – 4:40** | **6. Cofrinhos** | Exibir as 3 metas com histórico de `goal_contributions`: **Reserva de Emergência** (`R$ 5.800,00 / R$ 10.000,00`), **Viagem de Férias** (`R$ 1.700,00 / R$ 3.000,00`) e **Notebook Novo** (`R$ 1.500,00 / R$ 4.500,00`), destacando que depósitos/retiradas não distorcem despesas mensais. |
@@ -67,4 +67,4 @@
 3. **Se o Supabase sofrer latência ou bloqueio de rede local:**
    - Somente em último caso e declarando explicitamente **"Modo Demonstração local (contingência offline)"**, clicar em **"Explorar em Modo Demonstração"** na tela inicial para mostrar a interface interativa sem depender de rede.
 4. **Restauração pós-ensaio antes da banca:**
-   - Caso faça ensaios criando lançamentos na conta `rhuan3003@gmail.com`, remova os lançamentos extras pelo próprio Extrato e execute `npm run seed:presentation` para garantir exatamente os 31 lançamentos, 6 orçamentos e 3 cofrinhos iniciais.
+   - Caso faça ensaios criando lançamentos na conta demonstrativa, remova os lançamentos extras pelo próprio Extrato e execute `npm run seed:presentation` para garantir exatamente os 31 lançamentos, 6 orçamentos e 3 cofrinhos iniciais.

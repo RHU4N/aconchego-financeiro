@@ -230,7 +230,7 @@ Passo a passo detalhado em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) e roteiro 
 
 Execuções e validações verificadas:
 - `npm ci`, `npm run lint`, `npm test` (**32/32**), `npm run build` e suítes Playwright locais/reais aprovados.
-- **Conta demonstrativa real (`rhuan3003@gmail.com`)** populada de forma idempotente com [`scripts/seed-presentation.ts`](scripts/seed-presentation.ts): **31** transações (Out–Nov/2026), **6** orçamentos (incluindo alertas de 89% e 116%), **3** cofrinhos com **8** movimentações históricas e **1** comprovante sintético privado.
+- **Conta demonstrativa real** (configurada via variáveis de ambiente `PRES_USER_EMAIL` / `PRES_USER_PASSWORD`, sem credenciais no repositório) populada de forma idempotente com [`scripts/seed-presentation.ts`](scripts/seed-presentation.ts): **31** transações (Out–Nov/2026), **6** orçamentos (incluindo alertas de 89% e 116%), **3** cofrinhos com **8** movimentações históricas e **1** comprovante sintético privado.
 - **Gemini API real (`gemini-flash-lite-latest`, `apiVersion: 'v1beta'`)**: todas as **11 ferramentas** chamadas e validadas contra o backend em Production (`getFinancialSummary`, `listTransactions`, `listBudgets`, `listFinancialGoals`, `analyzeSpending`, `suggestBudgetPlan`, `proposeCreateTransaction`, `proposeUpdateTransaction`, `proposeDeleteTransaction`, `proposeUpdateBudget`, `proposeGoalContribution`), exigindo confirmação humana via `confirm_agent_operation` e bloqueando duplicidade com HTTP **409**.
 - **Supabase (`fhrmqspsxnodlftunsfa`)**: três migrations aplicadas, RLS nas dez tabelas, buckets privados `receipts` e `goal-images` (com renovação automática de URL assinada expirada na galeria), e bloqueio de acesso por usuário distinto e por cliente anônimo. Advisor sem erros de schema, com um aviso (`WARN`) para proteção contra senhas vazadas desativada.
 - Vitest usa mocks; testes reais ficam em [`e2e/live-integrations.spec.ts`](e2e/live-integrations.spec.ts) e [`e2e/presentation-smoke.spec.ts`](e2e/presentation-smoke.spec.ts) (ignorados no CI quando não há credenciais configuradas).
@@ -242,7 +242,6 @@ Execuções e validações verificadas:
 - O saldo inicial de um cofrinho criado pela UI é informado separadamente das contribuições subsequentes. Upload em Storage e gravação de metadados/transação usam requisições distintas; podem exigir limpeza de órfãos em falhas parciais.
 - A interface demo funciona sem login; consumir IA nesse modo exige ativação explícita com `ENABLE_DEMO_AI=true`. O padrão protege a chave Gemini contra uso público sem conta.
 - Não há movimentação bancária real nem integração Open Finance.
-- As melhorias da branch `feat/apresentacao-parte3-2026-11-24` (seed idempotente, renovação de URL assinada expirada na galeria, smoke test de apresentação e roteiro) ficam disponíveis em Preview até autorização para merge em `main` e promoção de Production.
 
 ## 18. Melhorias Futuras
 
