@@ -37,7 +37,7 @@ Sem essas contas o teste é ignorado com **NÃO VALIDADO**. CI não recebe senha
 
 A suíte SQL `supabase/tests/financial_integrity.sql` deve rodar apenas em PostgreSQL local descartável com as migrations aplicadas. Os papéis de teste assumem `authenticated` e tudo termina com `ROLLBACK`. Foi executada com PostgreSQL embarcado PGlite, com stubs locais de Auth e Storage; não representa validação de login Supabase.
 
-**NÃO VALIDADOS:** entrega SMTP, cadastro público, recuperação de senha e chamadas reais das outras nove ferramentas Gemini. Consulte o resultado de produção em [RELEASE.md](RELEASE.md).
+**NÃO VALIDADOS:** entrega SMTP, cadastro público com confirmação por e-mail e recuperação automática por e-mail. As **11 ferramentas do agente Gemini** foram validadas em chamadas reais contra `https://aconchego-financeiro-zeta.vercel.app`, e o smoke test completo da apresentação (`e2e/presentation-smoke.spec.ts`) valida login real, seed persistido (`scripts/seed-presentation.ts`), UI, Gemini real, confirmação atômica e isolamento RLS (sendo ignorado no CI quando `PRES_USER_EMAIL` e `PRES_USER_PASSWORD` não estão presentes). Consulte o resultado de produção em [RELEASE.md](RELEASE.md) e o roteiro em [APRESENTACAO_PARTE3.md](APRESENTACAO_PARTE3.md).
 
 ## 4. Integração Contínua (GitHub Actions)
 

@@ -118,6 +118,7 @@ export interface FinanceRepository {
     notes?: string
   ): Promise<{ goal: PiggyBankGoal; contribution: GoalContribution }>;
   checkReceiptDuplicate(fileHash: string): Promise<boolean>;
+  refreshReceiptUrl?(receiptPath: string): Promise<string | undefined>;
   loadAgentHistory(): Promise<{
     conversations: AgentConversation[];
     messages: AgentMessage[];
@@ -150,6 +151,10 @@ export class SupabaseFinanceRepository implements FinanceRepository {
       return undefined;
     }
     return data.signedUrl;
+  }
+
+  async refreshReceiptUrl(receiptPath: string): Promise<string | undefined> {
+    return this.signPrivateUrl('receipts', receiptPath);
   }
 
   async loadAll(): Promise<LoadedFinanceData> {

@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
   CreditCard,
   Link2,
+  RefreshCw,
 } from 'lucide-react';
 import { SAMPLE_RECEIPT_LINKS } from '../data/initialData';
 import { Transaction } from '../types/finance';
@@ -17,16 +18,20 @@ interface ReceiptsGalleryViewProps {
   transactions: Transaction[];
   onViewReceipt: (tx: Transaction) => void;
   onNewTransactionWithImage: (imageUrl: string) => void;
+  onRefreshReceiptUrl?: (receiptPath: string) => Promise<string | undefined>;
 }
 
 export const ReceiptsGalleryView: React.FC<ReceiptsGalleryViewProps> = ({
   transactions,
   onViewReceipt,
   onNewTransactionWithImage,
+  onRefreshReceiptUrl,
 }) => {
   const [testUrl, setTestUrl] = useState('');
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
+  const [refreshedIds, setRefreshedIds] = useState<Record<string, boolean>>({});
+  const [failedIds, setFailedIds] = useState<Record<string, boolean>>({});
 
   const receipts = transactions.filter((t) => Boolean(t.imageUrl));
   const resolvedTestUrl = resolveAssetUrl(testUrl);
@@ -184,12 +189,45 @@ export const ReceiptsGalleryView: React.FC<ReceiptsGalleryViewProps> = ({
                     onClick={() => onViewReceipt({ ...tx, imageUrl: resolvedUrl })}
                     title="Clique para ampliar o comprovante"
                   >
-                    <img
-                      src={resolvedUrl}
-                      alt={tx.description}
-                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
-                      referrerPolicy="no-referrer"
-                    />
+                    {!failedIds[tx.id] ? (
+                      <img
+                        src={resolvedUrl}
+                        alt={tx.description}
+                        className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                        onError={async () => {
+                          if (!refreshedIds[tx.id] && tx.receiptPath && onRefreshReceiptUrl) {
+                            setRefreshedIds((prev) => ({ ...prev, [tx.id]: true }));
+                            const nextUrl = await onRefreshReceiptUrl(tx.receiptPath);
+                            if (nextUrl) return;
+                          }
+                          setFailedIds((prev) => ({ ...prev, [tx.id]: true }));
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-3 text-center text-[#5C6661]">
+                        <ImageIcon className="w-6 h-6 text-[#9EA6A0]" />
+                        <span className="text-[11px] font-medium">
+                          Link temporário expirado ou indisponível
+                        </span>
+                        {tx.receiptPath && onRefreshReceiptUrl && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const nextUrl = await onRefreshReceiptUrl(tx.receiptPath!);
+                              if (nextUrl) {
+                                setFailedIds((prev) => ({ ...prev, [tx.id]: false }));
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FFFFFF] border border-[#D9D5CC] text-[11px] font-semibold text-[#274A3C] hover:bg-[#FAF9F6] cursor-pointer"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            <span>Recarregar imagem</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end p-2.5">
                       <span className="text-[11px] font-semibold text-white bg-black/60 px-2 py-0.5 rounded-full backdrop-blur-xs flex items-center gap-1">
                         <ImageIcon className="w-3 h-3" />

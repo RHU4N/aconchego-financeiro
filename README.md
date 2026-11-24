@@ -110,12 +110,19 @@ aconchego-financeiro/
 ├── api/[...route].ts                     # Adapter Vercel Functions para /api/*
 ├── docs/                                 # Documentação técnica detalhada
 │   ├── AGENT.md
+│   ├── APRESENTACAO_PARTE3.md            # Roteiro de apresentação (24/11/2026) e contingência
 │   ├── ARCHITECTURE.md
 │   ├── DATABASE.md
 │   ├── DEPLOYMENT.md
-│   └── TESTING.md
+│   ├── RELEASE.md
+│   ├── TESTING.md
+│   └── samples/                          # Comprovantes sintéticos PNG (dados fictícios)
 ├── e2e/
-│   └── aconchego.spec.ts                 # Testes E2E reais em navegador (Playwright)
+│   ├── aconchego.spec.ts                 # Testes E2E em navegador (Playwright)
+│   ├── live-integrations.spec.ts         # E2E real com 2 contas Supabase, Gemini e Storage
+│   └── presentation-smoke.spec.ts        # Smoke test completo da apresentação (Parte 3)
+├── scripts/
+│   └── seed-presentation.ts              # Seed idempotente da conta demonstrativa no Supabase
 ├── src/
 │   ├── assets/images/                    # Imagens locais empacotadas pelo Vite
 │   ├── components/                       # Telas e modais React
@@ -180,7 +187,8 @@ Acesse `http://localhost:3000`. Sem variáveis do Supabase no `.env`, você aind
 Outros scripts disponíveis:
 - `npm run lint` — Verificação TypeScript (`tsc --noEmit`)
 - `npm test` — Execução da suíte Vitest
-- `npm run test:e2e` — Testes E2E em navegador Chromium com Playwright (`e2e/aconchego.spec.ts`)
+- `npm run test:e2e` — Testes E2E em navegador Chromium com Playwright
+- `npm run seed:presentation` — Popula de forma idempotente a conta demonstrativa no Supabase (`PRES_USER_EMAIL` / `PRES_USER_PASSWORD` via ambiente)
 - `npm run build` — Build de produção Vite (`dist/`)
 - `npm run start` — Inicia o servidor Express (`tsx server.ts`)
 - `npm run clean` — Remove diretórios `dist`, `coverage` e `server.js`
@@ -214,29 +222,27 @@ Mais detalhes sobre escopo de testes, E2E e mocks em [`docs/TESTING.md`](docs/TE
 1. Conecte o repositório `RHU4N/aconchego-financeiro` (fork de `medeirosfbia/aconchego-financeiro`) na Vercel com **Framework Preset: Vite**, **Build Command: `npm run build`** e **Output Directory: `dist`**.
 2. Cadastre as 5 variáveis de ambiente do `.env.example` nas configurações do projeto (`Preview` e `Production`).
 3. Configure `Site URL` e `Redirect URLs` no Supabase Auth com o domínio gerado pela Vercel.
-4. Preview mais recente publicado com Supabase e Gemini configurados: `https://aconchego-financeiro-2si5igpjy-rhu4ns-projects.vercel.app`.
+4. **Aplicação publicada em Production:** [aconchego-financeiro-zeta.vercel.app](https://aconchego-financeiro-zeta.vercel.app).
 
-Passo a passo detalhado em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+Passo a passo detalhado em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) e roteiro demonstrativo da Parte 3 em [`docs/APRESENTACAO_PARTE3.md`](docs/APRESENTACAO_PARTE3.md).
 
 ## 16. Resultados Comprovados dos Testes
 
-Auditoria de 18/11/2026:
-- `npm ci`, `npm run lint`, `npm test` (**32/32**), `npm run build` e `npm run test:e2e` (**5/5**) aprovados.
-- O E2E real usa duas contas sintéticas confirmadas: login pela interface, CRUD e reload, orçamento, depósito/resgate, scanner Gemini com prévia editável, upload privado e bloqueio de leitura por outra conta e por anônimo.
-- Gemini real: `getFinancialSummary` e `proposeCreateTransaction`; nenhuma transação antes da confirmação; duas confirmações concorrentes retornam **200 e 409** e gravam um único lançamento.
-- Supabase: três migrations aplicadas em `fhrmqspsxnodlftunsfa`, RLS nas dez tabelas e buckets privados. Advisor sem erros de schema, com um aviso de proteção contra senhas vazadas desativada.
-- Vitest usa mocks; testes reais ficam em `e2e/live-integrations.spec.ts`. Sem credenciais de teste, esse teste é marcado **NÃO VALIDADO** e ignorado.
-- A confirmação no banco usa `confirm_agent_operation` com RLS, bloqueio de linha e rollback integral. Testes SQL locais também verificaram falha e rollback.
+Execuções e validações verificadas:
+- `npm ci`, `npm run lint`, `npm test` (**32/32**), `npm run build` e suítes Playwright locais/reais aprovados.
+- **Conta demonstrativa real (`rhuan3003@gmail.com`)** populada de forma idempotente com [`scripts/seed-presentation.ts`](scripts/seed-presentation.ts): **31** transações (Out–Nov/2026), **6** orçamentos (incluindo alertas de 89% e 116%), **3** cofrinhos com **8** movimentações históricas e **1** comprovante sintético privado.
+- **Gemini API real (`gemini-flash-lite-latest`, `apiVersion: 'v1beta'`)**: todas as **11 ferramentas** chamadas e validadas contra o backend em Production (`getFinancialSummary`, `listTransactions`, `listBudgets`, `listFinancialGoals`, `analyzeSpending`, `suggestBudgetPlan`, `proposeCreateTransaction`, `proposeUpdateTransaction`, `proposeDeleteTransaction`, `proposeUpdateBudget`, `proposeGoalContribution`), exigindo confirmação humana via `confirm_agent_operation` e bloqueando duplicidade com HTTP **409**.
+- **Supabase (`fhrmqspsxnodlftunsfa`)**: três migrations aplicadas, RLS nas dez tabelas, buckets privados `receipts` e `goal-images` (com renovação automática de URL assinada expirada na galeria), e bloqueio de acesso por usuário distinto e por cliente anônimo. Advisor sem erros de schema, com um aviso (`WARN`) para proteção contra senhas vazadas desativada.
+- Vitest usa mocks; testes reais ficam em [`e2e/live-integrations.spec.ts`](e2e/live-integrations.spec.ts) e [`e2e/presentation-smoke.spec.ts`](e2e/presentation-smoke.spec.ts) (ignorados no CI quando não há credenciais configuradas).
 
 ## 17. Limitações Reais e Pendências
 
-- Cadastro por e-mail, recuperação de senha, SMTP dedicado e entrega de mensagens não foram validados de ponta a ponta. As contas E2E foram provisionadas pela API administrativa; todos os testes financeiros usam JWT comum e RLS.
-- Apenas duas das onze ferramentas foram chamadas com Gemini real nesta auditoria; as demais têm cobertura determinística com mocks.
+- Cadastro por e-mail, recuperação de senha, SMTP dedicado e entrega de mensagens não foram validados de ponta a ponta (a conta demonstrativa de apresentação e as contas E2E foram confirmadas via API administrativa; todos os fluxos financeiros operam com JWT comum e RLS).
 - O rate limiter reside na memória de cada instância; não é uma cota global entre funções Vercel.
-- O saldo inicial de um cofrinho é informado separadamente das contribuições. Upload em Storage e gravação de metadados/transação usam requisições distintas; podem exigir limpeza de órfãos em falhas parciais.
+- O saldo inicial de um cofrinho criado pela UI é informado separadamente das contribuições subsequentes. Upload em Storage e gravação de metadados/transação usam requisições distintas; podem exigir limpeza de órfãos em falhas parciais.
 - A interface demo funciona sem login; consumir IA nesse modo exige ativação explícita com `ENABLE_DEMO_AI=true`. O padrão protege a chave Gemini contra uso público sem conta.
 - Não há movimentação bancária real nem integração Open Finance.
-- Produção será considerada validada somente após o teste do deployment de Production; o estado final é registrado em [docs/RELEASE.md](docs/RELEASE.md).
+- As melhorias da branch `feat/apresentacao-parte3-2026-11-24` (seed idempotente, renovação de URL assinada expirada na galeria, smoke test de apresentação e roteiro) ficam disponíveis em Preview até autorização para merge em `main` e promoção de Production.
 
 ## 18. Melhorias Futuras
 

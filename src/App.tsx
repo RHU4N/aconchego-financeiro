@@ -464,6 +464,18 @@ export default function App({
     await loadAllData();
   };
 
+  const handleRefreshReceiptUrl = async (receiptPath: string): Promise<string | undefined> => {
+    const repo = repositoryRef.current;
+    if (!repo?.refreshReceiptUrl) return undefined;
+    const nextUrl = await repo.refreshReceiptUrl(receiptPath);
+    if (nextUrl) {
+      setTransactions((prev) =>
+        prev.map((tx) => (tx.receiptPath === receiptPath ? { ...tx, imageUrl: nextUrl } : tx))
+      );
+    }
+    return nextUrl;
+  };
+
   // Auth Gate
   if (!authReady) {
     return (
@@ -661,6 +673,7 @@ export default function App({
                 onNewTransactionWithImage={(imageUrl) =>
                   handleOpenNewTransaction('expense', imageUrl)
                 }
+                onRefreshReceiptUrl={handleRefreshReceiptUrl}
               />
             )}
           </>
